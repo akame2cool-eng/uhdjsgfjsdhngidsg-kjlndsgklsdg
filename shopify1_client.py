@@ -36,11 +36,8 @@ class Shopify1CheckoutAutomation:
             chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
             chrome_options.add_experimental_option('useAutomationExtension', False)
             
-            # USER AGENT casuale
-            user_agents = [
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            ]
-            chrome_options.add_argument(f"--user-agent={random.choice(user_agents)}")
+            # USER AGENT
+            chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             
             # CONFIGURA PROXY se fornito
             if self.proxy_url:
@@ -57,93 +54,11 @@ class Shopify1CheckoutAutomation:
             logger.error(f"❌ Errore inizializzazione driver: {e}")
             return False
 
-    def close_popups(self):
-        """Chiude popup e banner che potrebbero bloccare i click"""
-        try:
-            logger.info("🔍 Cercando popup da chiudere...")
-            
-            # Lista di selettori per popup comuni su Shopify
-            popup_selectors = [
-                "#shopify-pc__banner",  # Popup che ha causato l'errore
-                ".shopify-pc__banner__dialog",
-                ".popup",
-                ".modal",
-                ".newsletter-popup",
-                "#newsletter-popup",
-                ".age-verification",
-                "#age-verification",
-                ".cookie-banner",
-                "#cookie-banner",
-                "[aria-label*='close']",
-                ".close-button",
-                ".popup-close",
-                ".modal-close"
-            ]
-            
-            for selector in popup_selectors:
-                try:
-                    popup = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    if popup.is_displayed():
-                        # Prova a trovare e cliccare il bottone close
-                        close_buttons = [
-                            f"{selector} [aria-label*='close']",
-                            f"{selector} .close",
-                            f"{selector} .close-button",
-                            f"{selector} .popup-close",
-                            f"{selector} .modal-close",
-                            f"{selector} button",
-                            f"{selector} [class*='close']"
-                        ]
-                        
-                        for close_selector in close_buttons:
-                            try:
-                                close_btn = self.driver.find_element(By.CSS_SELECTOR, close_selector)
-                                if close_btn.is_displayed():
-                                    self.driver.execute_script("arguments[0].click();", close_btn)
-                                    logger.info(f"✅ Chiuso popup con: {close_selector}")
-                                    time.sleep(1)
-                                    break
-                            except:
-                                continue
-                            
-                except:
-                    continue
-            
-            # Prova anche con JavaScript per rimuovere overlay
-            try:
-                self.driver.execute_script("""
-                    // Rimuovi overlay che bloccano i click
-                    const overlays = document.querySelectorAll('.popup-overlay, .modal-overlay, .popup-backdrop');
-                    overlays.forEach(overlay => {
-                        if (overlay) overlay.style.display = 'none';
-                    });
-                    
-                    // Rimuovi popup che bloccano
-                    const blockers = document.querySelectorAll('#shopify-pc__banner, .shopify-pc__banner__dialog');
-                    blockers.forEach(blocker => {
-                        if (blocker) blocker.style.display = 'none';
-                    });
-                    
-                    // Rimuovi elementi fixed che potrebbero bloccare
-                    const fixedElements = document.querySelectorAll('[style*="fixed"]');
-                    fixedElements.forEach(el => {
-                        if (el.getBoundingClientRect().top < 100) {
-                            el.style.display = 'none';
-                        }
-                    });
-                """)
-                logger.info("✅ Rimossi overlay con JavaScript")
-            except:
-                pass
-                
-        except Exception as e:
-            logger.info(f"ℹ️ Nessun popup trovato o errore nella chiusura: {e}")
-
     def generate_italian_info(self):
         """Genera informazioni italiane per il checkout"""
-        first_names = ['Marco', 'Luca', 'Giuseppe', 'Andrea']
-        last_names = ['Rossi', 'Bianchi', 'Verdi', 'Russo']
-        streets = ['Via Roma', 'Corso Italia', 'Piazza della Signoria']
+        first_names = ['Marco', 'Luca', 'Giuseppe', 'Andrea', 'Roberto', 'Alessandro']
+        last_names = ['Rossi', 'Bianchi', 'Verdi', 'Russo', 'Ferrari', 'Romano']
+        streets = ['Via Roma', 'Corso Italia', 'Piazza della Signoria', 'Via dei Calzaiuoli', 'Borgo San Jacopo']
         
         return {
             'first_name': random.choice(first_names),
@@ -153,340 +68,245 @@ class Shopify1CheckoutAutomation:
             'address': f"{random.choice(streets)} {random.randint(1, 150)}",
             'city': 'Firenze',
             'postal_code': f"50{random.randint(100, 999)}",
+            'card_number': '4111111111111111',
+            'expiry': '12/2028',
+            'cvv': '123',
             'name_on_card': 'TEST CARD'
         }
     
     def add_to_cart(self):
         """Aggiunge il prodotto al carrello"""
+        print("🛒 Aggiunta prodotto al carrello...")
+        
         try:
-            logger.info("🛒 Aggiunta prodotto Shopify $1 al carrello...")
             self.driver.get("https://earthesim.com/products/usa-esim?variant=42902995271773")
             time.sleep(5)
             
-            # Chiudi eventuali popup prima di cliccare
-            self.close_popups()
-            time.sleep(2)
+            add_button = self.wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button[type='submit']")))
+            add_button.click()
+            print("✅ Prodotto aggiunto al carrello")
             
-            # Aspetta che il bottone sia cliccabile
-            add_button_selectors = [
-                "button[type='submit'][name='add']",
-                "button[type='submit']",
-                "#ProductSubmitButton-template--17324883378269__main",
-                ".product-form__submit",
-                "button[class*='add-to-cart']"
-            ]
-            
-            add_button = None
-            for selector in add_button_selectors:
-                try:
-                    add_button = self.wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, selector)))
-                    logger.info(f"✅ Trovato bottone con: {selector}")
-                    break
-                except:
-                    continue
-            
-            if not add_button:
-                logger.error("❌ Bottone add to cart non trovato")
-                return False
-            
-            # Prova prima con JavaScript click per evitare interception
-            try:
-                self.driver.execute_script("arguments[0].scrollIntoView(true);", add_button)
-                time.sleep(1)
-                self.driver.execute_script("arguments[0].click();", add_button)
-                logger.info("✅ Prodotto aggiunto al carrello via JavaScript")
-            except Exception as js_error:
-                logger.warning(f"⚠️ JavaScript click fallito: {js_error}, provo click normale")
-                try:
-                    add_button.click()
-                    logger.info("✅ Prodotto aggiunto al carrello via click normale")
-                except Exception as click_error:
-                    logger.error(f"❌ Anche click normale fallito: {click_error}")
-                    return False
-            
-            # Verifica che il prodotto sia stato aggiunto
+            print("⏳ Attendo caricamento...")
             time.sleep(5)
-            
-            # Controlla se siamo ancora sulla pagina prodotto (potrebbe esserci un errore)
-            current_url = self.driver.current_url
-            if "cart" not in current_url and "checkout" not in current_url:
-                # Potrebbe esserci un mini-cart o messaggio di successo
-                try:
-                    success_indicators = [
-                        ".cart-notification",
-                        "[class*='success']",
-                        "[class*='added']",
-                        ".ajax-cart__message"
-                    ]
-                    for indicator in success_indicators:
-                        try:
-                            element = self.driver.find_element(By.CSS_SELECTOR, indicator)
-                            if element.is_displayed():
-                                logger.info("✅ Prodotto aggiunto (confermato da messaggio)")
-                                return True
-                        except:
-                            continue
-                except:
-                    pass
-            
-            logger.info("✅ Prodotto presumibilmente aggiunto al carrello")
             return True
             
         except Exception as e:
-            logger.error(f"❌ Errore nell'aggiunta al carrello: {e}")
+            print(f"❌ Errore nell'aggiunta al carrello: {e}")
             return False
     
     def go_to_cart_and_checkout(self):
         """Va al carrello e clicca checkout"""
         try:
-            logger.info("🛒 Andando al carrello Shopify $1...")
-            
-            # Vai direttamente al carrello
+            print("🛒 Andando al carrello...")
             self.driver.get("https://earthesim.com/cart")
             time.sleep(5)
             
-            # Chiudi popup
-            self.close_popups()
-            time.sleep(2)
+            checkout_button = self.wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button#checkout")))
+            checkout_button.click()
+            print("✅ Cliccato 'Check out'")
             
-            # Verifica che ci siano prodotti nel carrello
-            try:
-                empty_cart = self.driver.find_element(By.CSS_SELECTOR, ".cart--empty, [class*='empty']")
-                if empty_cart.is_displayed():
-                    logger.error("❌ Carrello vuoto")
-                    return False
-            except:
-                pass  # Carrello non vuoto, procedi
-            
-            # Cerca il bottone checkout con diversi selettori
-            checkout_selectors = [
-                "button#checkout",
-                "a[href*='checkout']",
-                "button[name='checkout']",
-                "[value*='checkout']",
-                ".checkout-button",
-                "button[class*='checkout']",
-                "a.checkout"
-            ]
-            
-            checkout_button = None
-            for selector in checkout_selectors:
-                try:
-                    checkout_button = self.wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, selector)))
-                    logger.info(f"✅ Trovato bottone checkout con: {selector}")
-                    break
-                except:
-                    continue
-            
-            if not checkout_button:
-                logger.error("❌ Bottone checkout non trovato")
-                # Prova a cercare il link checkout nel testo
-                try:
-                    checkout_links = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'Checkout') or contains(text(), 'checkout')]")
-                    for link in checkout_links:
-                        if link.is_displayed() and link.is_enabled():
-                            self.driver.execute_script("arguments[0].click();", link)
-                            logger.info("✅ Cliccato checkout via testo")
-                            time.sleep(8)
-                            return True
-                except:
-                    pass
-                return False
-            
-            # Usa JavaScript click per evitare interception
-            try:
-                self.driver.execute_script("arguments[0].scrollIntoView(true);", checkout_button)
-                time.sleep(1)
-                self.driver.execute_script("arguments[0].click();", checkout_button)
-                logger.info("✅ Cliccato 'Check out' Shopify $1 via JavaScript")
-            except Exception as js_error:
-                logger.warning(f"⚠️ JavaScript click fallito: {js_error}, provo click normale")
-                try:
-                    checkout_button.click()
-                    logger.info("✅ Cliccato 'Check out' Shopify $1 via click normale")
-                except Exception as click_error:
-                    logger.error(f"❌ Anche click normale fallito: {click_error}")
-                    return False
-            
-            # Attendi il reindirizzamento a checkout
+            print("⏳ Attendo reindirizzamento a checkout...")
             time.sleep(8)
-            
-            # Verifica che siamo sulla pagina di checkout
-            current_url = self.driver.current_url
-            if "checkout" in current_url or "shopify.com" in current_url:
-                logger.info("✅ Successfully redirected to checkout")
-                return True
-            else:
-                logger.warning(f"⚠️ Possibile problema nel reindirizzamento: {current_url}")
-                # Potrebbe essere comunque OK, continua
-                return True
+            return True
             
         except Exception as e:
-            logger.error(f"❌ Errore nel checkout: {e}")
+            print(f"❌ Errore nel checkout: {e}")
             return False
     
     def fill_shipping_info(self, info):
         """Compila le informazioni di spedizione"""
+        print("📦 Compilazione informazioni di spedizione...")
+        
         try:
-            logger.info("📦 Compilazione informazioni di spedizione Shopify $1...")
+            print("⏳ Attendo caricamento pagina checkout...")
             time.sleep(10)
             
-            # Chiudi popup
-            self.close_popups()
-            time.sleep(2)
+            current_url = self.driver.current_url
+            print(f"🔍 URL corrente: {current_url}")
             
             # EMAIL
-            email_selectors = ["input#email", "input[name='email']", "[id*='email']"]
-            email_field = None
-            for selector in email_selectors:
-                try:
-                    email_field = self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selector)))
-                    break
-                except:
-                    continue
-            
-            if email_field:
-                email_field.clear()
-                email_field.send_keys(info['email'])
-                logger.info(f"✅ Email inserita: {info['email']}")
+            print("🔍 Cerco campo email...")
+            email_field = self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input#email")))
+            email_field.clear()
+            email_field.send_keys(info['email'])
+            print(f"✅ Email inserita: {info['email']}")
+            time.sleep(1)
             
             # FIRST NAME
-            first_name_selectors = ["input#TextField0", "input[name='first-name']", "input[placeholder*='First']"]
-            for selector in first_name_selectors:
-                try:
-                    first_name_field = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    first_name_field.clear()
-                    first_name_field.send_keys(info['first_name'])
-                    logger.info(f"✅ First Name inserito: {info['first_name']}")
-                    break
-                except:
-                    continue
+            print("🔍 Cerco campo first name...")
+            first_name_field = self.driver.find_element(By.CSS_SELECTOR, "input#TextField0")
+            first_name_field.clear()
+            first_name_field.send_keys(info['first_name'])
+            print(f"✅ First Name inserito: {info['first_name']}")
+            time.sleep(1)
             
             # LAST NAME
-            last_name_selectors = ["input#TextField1", "input[name='last-name']", "input[placeholder*='Last']"]
-            for selector in last_name_selectors:
-                try:
-                    last_name_field = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    last_name_field.clear()
-                    last_name_field.send_keys(info['last_name'])
-                    logger.info(f"✅ Last Name inserito: {info['last_name']}")
-                    break
-                except:
-                    continue
+            print("🔍 Cerco campo last name...")
+            last_name_field = self.driver.find_element(By.CSS_SELECTOR, "input#TextField1")
+            last_name_field.clear()
+            last_name_field.send_keys(info['last_name'])
+            print(f"✅ Last Name inserito: {info['last_name']}")
+            time.sleep(1)
             
             # ADDRESS
-            address_selectors = ["input#billing-address1", "input[name='address1']", "input[placeholder*='Address']"]
-            for selector in address_selectors:
-                try:
-                    address_field = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    address_field.clear()
-                    address_field.send_keys(info['address'])
-                    logger.info(f"✅ Address inserito: {info['address']}")
-                    break
-                except:
-                    continue
+            print("🔍 Cerco campo address...")
+            address_field = self.driver.find_element(By.CSS_SELECTOR, "input#billing-address1")
+            address_field.clear()
+            address_field.send_keys(info['address'])
+            print(f"✅ Address inserito: {info['address']}")
+            time.sleep(1)
             
             # CITY
-            city_selectors = ["input#TextField4", "input[name='city']", "input[placeholder*='City']"]
-            for selector in city_selectors:
-                try:
-                    city_field = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    city_field.clear()
-                    city_field.send_keys(info['city'])
-                    logger.info(f"✅ City inserita: {info['city']}")
-                    break
-                except:
-                    continue
+            print("🔍 Cerco campo city...")
+            city_field = self.driver.find_element(By.CSS_SELECTOR, "input#TextField4")
+            city_field.clear()
+            city_field.send_keys(info['city'])
+            print(f"✅ City inserita: {info['city']}")
+            time.sleep(1)
             
             # POSTAL CODE
-            postal_selectors = ["input#TextField3", "input[name='postal-code']", "input[placeholder*='Postal']"]
-            for selector in postal_selectors:
-                try:
-                    postal_field = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    postal_field.clear()
-                    postal_field.send_keys(info['postal_code'])
-                    logger.info(f"✅ Postal Code inserito: {info['postal_code']}")
-                    break
-                except:
-                    continue
+            print("🔍 Cerco campo postal code...")
+            postal_field = self.driver.find_element(By.CSS_SELECTOR, "input#TextField3")
+            postal_field.clear()
+            postal_field.send_keys(info['postal_code'])
+            print(f"✅ Postal Code inserito: {info['postal_code']}")
+            time.sleep(1)
             
             # PHONE NUMBER
-            phone_selectors = ["input#TextField5", "input[name='phone']", "input[placeholder*='Phone']"]
-            for selector in phone_selectors:
-                try:
-                    phone_field = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    phone_field.clear()
-                    phone_field.send_keys(info['phone'])
-                    logger.info(f"✅ Phone inserito: {info['phone']}")
-                    break
-                except:
-                    continue
+            print("🔍 Cerco campo phone...")
+            phone_field = self.driver.find_element(By.CSS_SELECTOR, "input#TextField5")
+            phone_field.clear()
+            phone_field.send_keys(info['phone'])
+            print(f"✅ Phone inserito: {info['phone']}")
+            time.sleep(1)
             
-            logger.info("✅ Informazioni spedizione Shopify $1 compilate")
             return True
             
         except Exception as e:
-            logger.error(f"❌ Errore nella compilazione shipping: {e}")
+            print(f"❌ Errore nella compilazione shipping: {e}")
             return False
     
     def fill_payment_info(self, info, card_data):
         """Compila le informazioni di pagamento"""
+        print("💳 Compilazione informazioni di pagamento...")
+        
         try:
-            logger.info("💳 Compilazione informazioni di pagamento Shopify $1...")
             time.sleep(3)
             
-            # CARD NUMBER
+            # I campi sono in iframe separati di Shopify PCI
+            print("🔍 Switchando agli iframe di Shopify PCI...")
+            
+            # CARD NUMBER - Iframe 2
+            print("🔍 Cerco iframe card number...")
             card_iframe = self.driver.find_element(By.CSS_SELECTOR, "iframe[name*='card-fields-number']")
             self.driver.switch_to.frame(card_iframe)
+            
             card_field = self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input#number")))
             card_field.clear()
             for char in card_data['number']:
                 card_field.send_keys(char)
                 time.sleep(0.05)
+            print(f"✅ Card number inserito: {card_data['number']}")
+            
             self.driver.switch_to.default_content()
             time.sleep(1)
             
             # EXPIRY DATE
+            print("🔍 Cerco iframe expiry...")
             expiry_iframe = self.driver.find_element(By.CSS_SELECTOR, "iframe[name*='card-fields-expiry']")
             self.driver.switch_to.frame(expiry_iframe)
+            
             expiry_field = self.driver.find_element(By.CSS_SELECTOR, "input#expiry")
+            
+            # Usa JavaScript per impostare il valore
             expiry_value = f"{card_data['month']}/{card_data['year']}"
             self.driver.execute_script("arguments[0].value = arguments[1];", expiry_field, expiry_value)
-            self.driver.execute_script("arguments[0].dispatchEvent(new Event('input', { bubbles: true }));", expiry_field)
+            self.driver.execute_script("""
+                arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+                arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+                arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));
+            """, expiry_field)
+            
+            actual_value = expiry_field.get_attribute('value')
+            print(f"✅ Expiry inserito: '{actual_value}'")
+            
             self.driver.switch_to.default_content()
             time.sleep(1)
             
-            # CVV
+            # CVV - Iframe 4
+            print("🔍 Cerco iframe CVV (Security code)...")
             cvv_iframe = self.driver.find_element(By.CSS_SELECTOR, "iframe[name*='card-fields-verification_value']")
             self.driver.switch_to.frame(cvv_iframe)
+            
             cvv_field = self.driver.find_element(By.CSS_SELECTOR, "input#verification_value")
+            cvv_field.clear()
+            
+            # Inserisci CVV con JavaScript
             self.driver.execute_script("arguments[0].value = arguments[1];", cvv_field, card_data['cvv'])
-            self.driver.execute_script("arguments[0].dispatchEvent(new Event('input', { bubbles: true }));", cvv_field)
+            self.driver.execute_script("""
+                arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+                arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+                arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));
+            """, cvv_field)
+            
+            actual_cvv = cvv_field.get_attribute('value')
+            print(f"✅ CVV (Security code) inserito: '{actual_cvv}'")
+            
             self.driver.switch_to.default_content()
             time.sleep(1)
             
-            # NAME ON CARD
+            # NAME ON CARD - Iframe 7
+            print("🔍 Cerco iframe name on card...")
             name_iframe = self.driver.find_element(By.CSS_SELECTOR, "iframe[name*='card-fields-name']")
             self.driver.switch_to.frame(name_iframe)
+            
             name_field = self.driver.find_element(By.CSS_SELECTOR, "input#name")
+            name_field.clear()
+            
+            # Inserisci nome con JavaScript
             self.driver.execute_script("arguments[0].value = arguments[1];", name_field, info['name_on_card'])
-            self.driver.execute_script("arguments[0].dispatchEvent(new Event('input', { bubbles: true }));", name_field)
+            self.driver.execute_script("""
+                arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+                arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+                arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));
+            """, name_field)
+            
+            actual_name = name_field.get_attribute('value')
+            print(f"✅ Name on card inserito: '{actual_name}'")
+            
             self.driver.switch_to.default_content()
             time.sleep(2)
             
-            # Forza validazione
-            try:
-                email_field = self.driver.find_element(By.CSS_SELECTOR, "input#email")
-                email_field.click()
-                time.sleep(1)
-            except:
-                pass
+            # FORZA L'AGGIORNAMENTO DELLA VALIDAZIONE
+            print("🔄 Forzo aggiornamento validazione...")
             
-            logger.info("✅ Informazioni pagamento Shopify $1 compilate")
+            # Clicca su un campo neutro per forzare il blur e la validazione
+            email_field = self.driver.find_element(By.CSS_SELECTOR, "input#email")
+            email_field.click()
+            time.sleep(1)
+            
+            # Oppure usa JavaScript per forzare la validazione di tutti i campi
+            self.driver.execute_script("""
+                // Forza la validazione di tutti i campi di pagamento
+                if (window.Shopify && window.Shopify.dynamicCheckout) {
+                    // Trigger della validazione Shopify
+                    const event = new Event('validate', { bubbles: true });
+                    document.dispatchEvent(event);
+                }
+                
+                // Forza il re-check di tutti i campi
+                const inputs = document.querySelectorAll('input');
+                inputs.forEach(input => {
+                    input.dispatchEvent(new Event('blur', { bubbles: true }));
+                });
+            """)
+            
+            time.sleep(3)
+            
             return True
             
         except Exception as e:
-            logger.error(f"❌ Errore nella compilazione pagamento: {e}")
+            print(f"❌ Errore nella compilazione pagamento: {e}")
             try:
                 self.driver.switch_to.default_content()
             except:
@@ -494,73 +314,139 @@ class Shopify1CheckoutAutomation:
             return False
     
     def complete_purchase(self):
-        """Completa l'acquisto"""
+        """Completa l'acquisto cliccando Pay Now"""
+        print("🚀 Completamento acquisto...")
+        
         try:
-            logger.info("🚀 Completamento acquisto Shopify $1...")
             time.sleep(3)
             
+            # Verifica se il bottone è abilitato
             pay_button = self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "button#checkout-pay-button")))
             
             is_enabled = pay_button.is_enabled()
-            logger.info(f"🔍 Bottone Pay Now Shopify $1 abilitato: {is_enabled}")
+            print(f"🔍 Bottone Pay Now abilitato: {is_enabled}")
             
             if not is_enabled:
-                self.driver.execute_script("document.activeElement.blur();")
+                print("🔄 Bottone disabilitato, provo a forzare l'abilitazione...")
+                
+                # Forza ulteriore validazione
+                self.driver.execute_script("""
+                    // Forza l'aggiornamento dello stato del bottone
+                    if (window.Shopify && window.Shopify.dynamicCheckout) {
+                        // Trigger dell'evento di aggiornamento
+                        const event = new Event('paymentMethodUpdated', { bubbles: true });
+                        document.dispatchEvent(event);
+                    }
+                    
+                    // Forza il blur su tutti i campi
+                    document.activeElement.blur();
+                """)
+                
                 time.sleep(3)
+                
+                # Verifica nuovamente
                 is_enabled = pay_button.is_enabled()
+                print(f"🔍 Bottone Pay Now dopo forzatura: {is_enabled}")
             
             if is_enabled:
-                self.driver.execute_script("arguments[0].click();", pay_button)
-                logger.info("✅ Cliccato 'Pay Now' Shopify $1 via JavaScript")
+                pay_button.click()
+                print("✅ Cliccato 'Pay Now'")
+                
+                print("⏳ Attendo elaborazione pagamento...")
                 time.sleep(10)
                 return True
             else:
+                print("❌ Bottone ancora disabilitato, verifico errori...")
+                
+                # Controlla errori specifici
+                page_text = self.driver.find_element(By.TAG_NAME, "body").text.lower()
+                error_messages = [
+                    "valid expiration date",
+                    "security code", 
+                    "name on card",
+                    "enter your name"
+                ]
+                
+                for error in error_messages:
+                    if error in page_text:
+                        print(f"   - Trovato errore: {error}")
+                
+                # Prova a cliccare comunque (a volte la UI non si aggiorna)
                 try:
+                    print("🔄 Provo a cliccare comunque il bottone...")
                     self.driver.execute_script("arguments[0].click();", pay_button)
-                    logger.info("✅ Cliccato 'Pay Now' Shopify $1 via JavaScript (forzato)")
+                    print("✅ Cliccato 'Pay Now' via JavaScript")
                     time.sleep(10)
                     return True
                 except:
-                    logger.error("❌ Impossibile cliccare il bottone Shopify $1")
+                    print("❌ Impossibile cliccare il bottone")
                     return False
                 
         except Exception as e:
-            logger.error(f"❌ Errore nel completamento acquisto: {e}")
+            print(f"❌ Errore nel completamento acquisto: {e}")
             return False
     
     def analyze_result(self):
         """Analizza il risultato della transazione"""
+        print("🔍 Analisi risultato transazione...")
+        
         try:
-            logger.info("🔍 Analisi risultato transazione Shopify $1...")
             time.sleep(8)
+            current_url = self.driver.current_url
             page_text = self.driver.find_element(By.TAG_NAME, "body").text.lower()
             
+            print(f"📄 URL corrente: {current_url}")
+            
             if "your card was declined" in page_text:
-                logger.info("❌ CARTA DECLINATA su Shopify $1")
+                print("\n" + "=" * 50)
+                print("❌ CARTA DECLINATA: Your card was declined.")
+                print("=" * 50)
                 return "DECLINED"
+            
             elif "thank you" in page_text or "order confirmed" in page_text:
-                logger.info("✅ PAGAMENTO EFFETTUATO su Shopify $1")
+                print("\n" + "=" * 50)
+                print("✅ PAGAMENTO EFFETTUATO: Payment successful!")
+                print("=" * 50)
                 return "APPROVED"
+            
             elif "3d" in page_text or "secure" in page_text:
-                logger.info("🛡️ 3D SECURE RICHIESTO su Shopify $1")
+                print("\n" + "=" * 50)
+                print("🛡️ 3D SECURE RICHIESTO: Additional verification required.")
+                print("=" * 50)
                 return "3DS_REQUIRED"
+            
             else:
-                logger.info("🔍 STATO SCONOSCIUTO su Shopify $1")
+                print("\n" + "=" * 50)
+                print("🔍 STATO SCONOSCIUTO: Controlla manualmente.")
+                print("=" * 50)
                 return "UNKNOWN"
             
         except Exception as e:
-            logger.error(f"💥 ERRORE nell'analisi: {str(e)}")
+            print(f"💥 ERRORE nell'analisi: {str(e)}")
             return "ERROR"
     
     def process_payment(self, card_data):
         """Processa il pagamento Shopify $1"""
         try:
-            logger.info(f"🚀 Inizio processo Shopify $1 con proxy: {self.proxy_url}")
+            print(f"🚀 Inizio processo Shopify $1 con proxy: {self.proxy_url}")
             
             if not self.setup_driver():
                 return "ERROR_DRIVER_INIT"
             
             test_info = self.generate_italian_info()
+            
+            # Sostituisci i dati della carta con quelli forniti
+            test_info['card_number'] = card_data['number']
+            test_info['expiry'] = f"{card_data['month']}/{card_data['year']}"
+            test_info['cvv'] = card_data['cvv']
+            
+            print(f"👤 Informazioni di test:")
+            print(f"   Nome: {test_info['first_name']} {test_info['last_name']}")
+            print(f"   Email: {test_info['email']}")
+            print(f"   Telefono: {test_info['phone']}")
+            print(f"   Indirizzo: {test_info['address']}, {test_info['city']}")
+            print(f"💳 Carta: {test_info['card_number']} | Scadenza: {test_info['expiry']}")
+            print(f"   CVV: {test_info['cvv']} | Name: {test_info['name_on_card']}")
             
             if not self.add_to_cart():
                 return "ERROR_ADD_TO_CART"
@@ -581,8 +467,8 @@ class Shopify1CheckoutAutomation:
             return result
             
         except Exception as e:
-            logger.error(f"❌ Errore durante pagamento Shopify $1: {e}")
-            return f"ERROR: {str(e)}"
+            print(f"💥 Errore durante il test: {e}")
+            return f"ERROR - {str(e)}"
         finally:
             if self.driver:
                 self.driver.quit()
